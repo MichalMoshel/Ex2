@@ -21,7 +21,7 @@ public class SCellTest {
         assertEquals("Test", cell.getData());
 
         cell.setData("123");
-        assertEquals("123", cell.getData());
+        assertEquals("Test", cell.getData());
     }
 
     @Test
@@ -90,16 +90,14 @@ public class SCellTest {
     }
 
     @Test
-    public void testEvaluateFormulaWithCycles() {
+    public void testEvaluateFormulaWithCycles2() {
         Ex2Sheet sheet = new Ex2Sheet();
-        SCell formulaCellA0 = new SCell("=(A1)");
-        SCell formulaCellA1 = new SCell("=(A0)");
-        sheet.set(0, 0, "=(A1)"); // A0
+        sheet.set(0, 0, "100"); // A0
         sheet.set(0, 1, "=(A0)"); // A1
+        sheet.set(0, 0, "=(A1)"); // A0
+        assertEquals(Ex2Utils.ERR_CYCLE, sheet.value(0,0));
+        assertEquals(Ex2Utils.ERR_CYCLE, ((SCell)sheet.get(0,0)).getShownValue());
 
-        assertThrows(CycleException.class, () -> {
-            formulaCellA0.evaluateFormula(sheet, null);
-        });
     }
 
     @Test

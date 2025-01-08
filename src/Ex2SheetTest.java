@@ -30,7 +30,7 @@ public class Ex2SheetTest {
         assertEquals("Hello", sheet.value(1, 1));
 
         sheet.set(2, 2, "123");
-        assertEquals("123", sheet.value(2, 2));
+        assertEquals("123.0", sheet.value(2, 2));
     }
 
     @Test
@@ -91,10 +91,11 @@ public class Ex2SheetTest {
     public void testFormulaParsingError() {
         // Set a cell with a malformed formula
         sheet.set(0, 0, "=A1+");
-        sheet.eval();
+
+
 
         // Check for formula parsing error
-        assertEquals(Ex2Utils.ERR_FORM, sheet.value(0, 0));
+        assertEquals(Ex2Utils.ERR_FORM, ((SCell)sheet.get(0, 0)).getShownValue());
     }
 
     @Test

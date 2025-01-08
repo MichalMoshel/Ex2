@@ -6,6 +6,7 @@ import java.util.*;
  */
 public class SCell implements Cell {
     private String line;
+    private String _cleanString;
     private int type;
     private int order;
 
@@ -14,6 +15,7 @@ public class SCell implements Cell {
      * @param s The data to initialize the cell.
      */
     public SCell(String s) {
+        _cleanString = s;
         setData(s);
     }
 
@@ -69,8 +71,14 @@ public class SCell implements Cell {
      */
     @Override
     public void setData(String s) {
-        line = s;
-        setType(determineType(s));
+        if(isNumber(s)){
+            line = ""+Double.parseDouble(s);
+        } else {
+            line = s;
+        }
+        if(type != Ex2Utils.FORM){
+            setType(determineType(s));
+        }
     }
 
     /**
@@ -79,7 +87,7 @@ public class SCell implements Cell {
      */
     @Override
     public String getData() {
-        return line;
+        return _cleanString;
     }
 
     /**
@@ -176,11 +184,11 @@ public class SCell implements Cell {
         }
 
         // Track visited cells to detect cycles
-        String formula = line.substring(1); // Remove "="
+
+        String formula = getData().startsWith("=") ? getData().substring(1): getData(); // Remove "="
         String result;
 
         result = String.valueOf(parseFormula(formula, sheet, visited));
-        type = Ex2Utils.NUMBER; // Successfully evaluated to a number
         order = computeOrder(formula, sheet); // Update order based on dependencies
 
         if(thisCell != null){
@@ -189,6 +197,10 @@ public class SCell implements Cell {
 
         line = result; // Update cell data with the evaluated result
         return result;
+    }
+
+    public String getShownValue(){
+        return line;
     }
 
     /**
@@ -216,8 +228,12 @@ public class SCell implements Cell {
                 return Double.parseDouble(refCell.getData());
             } else if (refCell.getType() == Ex2Utils.FORM) {
                 return Double.parseDouble(((SCell) refCell).evaluateFormula(sheet, visited));
-            } else {
+            } else if (refCell.getType() == Ex2Utils.ERR_CYCLE_FORM || Objects.equals(((SCell)refCell).getShownValue(), Ex2Utils.ERR_CYCLE)) {
+                throw new CycleException("Recursive cell reference: " + formula);
+            } else if (refCell.getType() == Ex2Utils.ERR_FORM_FORMAT) {
                 throw new FormulaException("Invalid or unresolved cell reference: " + formula);
+            } else {
+                //TODO: Handle string
             }
         }
 

@@ -36,41 +36,45 @@ public class Ex2Sheet implements Sheet {
      * @param y The column index.
      * @return The value of the cell, or an empty cell if out of bounds or uninitialized.
      */
-    @Override
-    public String value(int x, int y) {
-        if (!isIn(x, y)) return Ex2Utils.EMPTY_CELL;
-        Cell c = get(x, y);
-        if (c == null) return Ex2Utils.EMPTY_CELL;
+        @Override
+        public String value(int x, int y) {
+            if (!isIn(x, y)) return Ex2Utils.EMPTY_CELL;
+            Cell c = get(x, y);
+            if (c == null) return Ex2Utils.EMPTY_CELL;
+    
+            // Check the type of the cell and handle accordingly
+            switch (c.getType()) {
+                case Ex2Utils.TEXT:
+                    return ((SCell)c).getShownValue(); // Return the raw data for TEXT and NUMBER types.
+                case Ex2Utils.NUMBER:
+                    double d = Double.parseDouble(c.getData());
+                    return ""+d; //convert to string
+    
+                case Ex2Utils.FORM:
+                    try {
+                        // Evaluate the formula using SCell's evaluateFormula
+                        SCell sCell = (SCell) c;
+                        String res = sCell.evaluateFormula(this);
 
-        // Check the type of the cell and handle accordingly
-        switch (c.getType()) {
-            case Ex2Utils.TEXT:
-            case Ex2Utils.NUMBER:
-                return c.getData(); // Return the raw data for TEXT and NUMBER types.
-
-            case Ex2Utils.FORM:
-                try {
-                    // Evaluate the formula using SCell's evaluateFormula
-                    SCell sCell = (SCell) c;
-                    return sCell.evaluateFormula(this);
-                } catch (StackOverflowError | CycleException e) {
-                    c.setType(Ex2Utils.ERR_CYCLE_FORM);
+                        return sCell.evaluateFormula(this);
+                    } catch (StackOverflowError | CycleException e) {
+                        c.setType(Ex2Utils.ERR_CYCLE_FORM);
+                        return Ex2Utils.ERR_CYCLE;
+                    } catch (IllegalArgumentException e) {
+                        c.setType(Ex2Utils.ERR_FORM_FORMAT);
+                        return Ex2Utils.ERR_FORM;
+                    }
+    
+                case Ex2Utils.ERR_CYCLE_FORM:
                     return Ex2Utils.ERR_CYCLE;
-                } catch (IllegalArgumentException e) {
-                    c.setType(Ex2Utils.ERR_FORM_FORMAT);
+    
+                case Ex2Utils.ERR_FORM_FORMAT:
                     return Ex2Utils.ERR_FORM;
-                }
-
-            case Ex2Utils.ERR_CYCLE_FORM:
-                return Ex2Utils.ERR_CYCLE;
-
-            case Ex2Utils.ERR_FORM_FORMAT:
-                return Ex2Utils.ERR_FORM;
-
-            default:
-                return Ex2Utils.EMPTY_CELL;
+    
+                default:
+                    return Ex2Utils.EMPTY_CELL;
+            }
         }
-    }
 
     /**
      * Returns the cell at the specified coordinates.
@@ -140,6 +144,7 @@ public class Ex2Sheet implements Sheet {
     public void set(int x, int y, String s) {
         if (!isIn(x, y)) return;
         table[x][y] = new SCell(s);
+        this.eval();
     }
 
     /**
@@ -154,7 +159,6 @@ public class Ex2Sheet implements Sheet {
                 if (cell != null && cell.getType() == Ex2Utils.FORM) {
                     try {
                         cell.setData(value(x, y));
-                        cell.setType(Ex2Utils.NUMBER); // Assume evaluation results in a number
                     } catch (StackOverflowError | CycleException e) {
                         cell.setType(Ex2Utils.ERR_CYCLE_FORM);
                     } catch (Exception e)  {
