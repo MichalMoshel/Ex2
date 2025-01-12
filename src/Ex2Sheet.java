@@ -1,249 +1,339 @@
 import java.io.*;
-import java.util.HashMap;
+// Add your documentation below:
 
-/**
- * Represents a 2D spreadsheet where cells can store text, numbers, or formulas.
- * Provides methods for cell manipulation, formula evaluation, saving and loading data.
- */
 public class Ex2Sheet implements Sheet {
     private Cell[][] table;
 
-    /**
-     * Constructs a new Ex2Sheet with the specified dimensions (x by y) and initializes all cells.
-     * @param x The number of rows in the sheet.
-     * @param y The number of columns in the sheet.
-     */
+
     public Ex2Sheet(int x, int y) {
         table = new SCell[x][y];
-        for (int i = 0; i < x; i++) {
-            for (int j = 0; j < y; j++) {
+        for (int i = 0; i < x; i = i + 1) {
+            for (int j = 0; j < y; j = j + 1) {
                 table[i][j] = new SCell(Ex2Utils.EMPTY_CELL);
             }
         }
         eval();
     }
 
-    /**
-     * Constructs a new Ex2Sheet with default dimensions (width and height defined in Ex2Utils).
-     */
     public Ex2Sheet() {
         this(Ex2Utils.WIDTH, Ex2Utils.HEIGHT);
     }
 
-    /**
-     * Returns the value of a cell at the specified coordinates.
-     * @param x The row index.
-     * @param y The column index.
-     * @return The value of the cell, or an empty cell if out of bounds or uninitialized.
-     */
-        @Override
-        public String value(int x, int y) {
-            if (!isIn(x, y)) return Ex2Utils.EMPTY_CELL;
-            Cell c = get(x, y);
-            if (c == null) return Ex2Utils.EMPTY_CELL;
-    
-            // Check the type of the cell and handle accordingly
-            switch (c.getType()) {
-                case Ex2Utils.TEXT:
-                    return ((SCell)c).getShownValue(); // Return the raw data for TEXT and NUMBER types.
-                case Ex2Utils.NUMBER:
-                    double d = Double.parseDouble(c.getData());
-                    return ""+d; //convert to string
-    
-                case Ex2Utils.FORM:
-                    try {
-                        // Evaluate the formula using SCell's evaluateFormula
-                        SCell sCell = (SCell) c;
-                        String res = sCell.evaluateFormula(this);
+    @Override
+    public String value(int x, int y) {
+        String ans = Ex2Utils.EMPTY_CELL;
 
-                        return sCell.evaluateFormula(this);
-                    } catch (StackOverflowError | CycleException e) {
-                        c.setType(Ex2Utils.ERR_CYCLE_FORM);
-                        return Ex2Utils.ERR_CYCLE;
-                    } catch (IllegalArgumentException e) {
-                        c.setType(Ex2Utils.ERR_FORM_FORMAT);
-                        return Ex2Utils.ERR_FORM;
-                    }
-    
-                case Ex2Utils.ERR_CYCLE_FORM:
-                    return Ex2Utils.ERR_CYCLE;
-    
-                case Ex2Utils.ERR_FORM_FORMAT:
-                    return Ex2Utils.ERR_FORM;
-    
-                default:
-                    return Ex2Utils.EMPTY_CELL;
-            }
-        }
+        SCell c = (SCell) get(x, y);
+        ans = switch (c.getType()) {
+            case Ex2Utils.NUMBER, Ex2Utils.TEXT -> c.toString();
+            case Ex2Utils.FORM -> c.getComputed();
+            case Ex2Utils.ERR_FORM_FORMAT -> "ERR_FORM";
+            case Ex2Utils.ERR_CYCLE_FORM -> "ERR_CYCLE";
+            default -> ans;
+        };
+        return ans;
+    }
 
-    /**
-     * Returns the cell at the specified coordinates.
-     * @param x The row index.
-     * @param y The column index.
-     * @return The cell at the given coordinates, or null if out of bounds.
-     */
     @Override
     public Cell get(int x, int y) {
-        return isIn(x, y) ? table[x][y] : null;
+        return table[x][y];
     }
 
-    /**
-     * Returns the cell corresponding to the specified string coordinate.
-     * @param cords The coordinate in string format (e.g., "A1").
-     * @return The cell at the given coordinate, or null if invalid.
-     */
     @Override
     public Cell get(String cords) {
-        CellEntry entry = CellEntry.fromString(cords);
-        if (entry == null || !entry.isValid()) return null;
-        return get(entry.getX(), entry.getY());
-    }
-
-    /**
-     * Finds the coordinates of a given cell in the sheet.
-     * @param cell The cell whose coordinates need to be found.
-     * @return The coordinates of the cell as a string, or null if the cell is not found.
-     */
-    public String findCoordinates(Cell cell) {
-        for (int x = 0; x < width(); x++) {
-            for (int y = 0; y < height(); y++) {
-                Cell c = get(x, y);
-                if (c != null && c.equals(cell)) {
-                    return new CellEntry(x, y).toString();
-                }
-            }
+        Cell ans = null;
+        Index2D c = new CellEntry(cords);
+        if (c.isValid() && isIn(c.getX(), c.getY())) {
+            ans = get(c.getX(), c.getY());
         }
-        return null; // Cell not found in the sheet
+        return ans;
     }
 
-    /**
-     * Returns the number of rows in the sheet.
-     * @return The number of rows.
-     */
     @Override
     public int width() {
         return table.length;
     }
 
-    /**
-     * Returns the number of columns in the sheet.
-     * @return The number of columns.
-     */
     @Override
     public int height() {
         return table[0].length;
     }
 
-    /**
-     * Sets the value of a cell at the specified coordinates.
-     * @param x The row index.
-     * @param y The column index.
-     * @param s The string value to set for the cell.
-     */
     @Override
     public void set(int x, int y, String s) {
-        if (!isIn(x, y)) return;
-        table[x][y] = new SCell(s);
-        this.eval();
+        Cell c = new SCell(s);
+        table[x][y] = c;
     }
 
-    /**
-     * Evaluates all formulas in the sheet, updating cells with results and handling errors.
-     */
     @Override
     public void eval() {
-        // Resolve all formulas, update orders, and detect errors
-        for (int x = 0; x < width(); x++) {
-            for (int y = 0; y < height(); y++) {
-                Cell cell = get(x, y);
-                if (cell != null && cell.getType() == Ex2Utils.FORM) {
-                    try {
-                        cell.setData(value(x, y));
-                    } catch (StackOverflowError | CycleException e) {
-                        cell.setType(Ex2Utils.ERR_CYCLE_FORM);
-                    } catch (Exception e)  {
-                        cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+        int[][] dd = depth(); // get the depth of each cell
+
+        int depth = 0; // the current depth
+        int count = 0; // the number of cells that have been computed
+        int max = width() * height(); // the maximum number of cells
+        boolean changed = true; // if there was a change in the last iteration
+        while (count < max && changed) {
+            changed = false;
+            for (int x = 0; x < width(); x = x + 1) {
+                for (int y = 0; y < height(); y = y + 1) {
+                    SCell c = (SCell) get(x, y);
+                    if(dd[x][y] == -1){ // means that the cell is cyclic
+                        c.setType(Ex2Utils.ERR_CYCLE_FORM);
+                        changed = true;
+                        count = count + 1;
+                    }else
+                    if (dd[x][y] == depth) { // if the cell is at the current depth, meaning that it can be computed
+                        String res = eval(x, y);
+                        c.setComputed(res);
+                        changed = true;
+                        count = count + 1;
+                    }
+                }
+            }
+            depth = depth + 1;
+        }
+    }
+
+    @Override
+    public boolean isIn(int xx, int yy) {
+        return xx >= 0 && yy >= 0 && xx < width() && yy < height();
+    }
+
+    @Override
+    public int[][] depth() {
+        int[][] ans = new int[width()][height()]; // matrix to store the depth of each cell
+        for (int x = 0; x < width(); x = x + 1) {
+            for (int y = 0; y < height(); y = y + 1) {
+                Cell c = get(x, y);
+                if (c.getType() == Ex2Utils.NUMBER || c.getType() == Ex2Utils.TEXT) { //the depth of a number or text cell is 0
+                    table[x][y].setOrder(0);
+                    ans[x][y] = 0;
+                } else {
+                    if (c.getType() == Ex2Utils.ERR_FORM_FORMAT) { // if the cell is an error form, reset it
+                        table[x][y].setData(table[x][y].toString());
+                    }
+                    ans[x][y] = -1;
+                    table[x][y].setOrder(-1);
+                }
+            }
+        }
+
+        int count = 0; // The number of cells that have been computed
+        int depth = 0; // The current depth
+        int max = width() * height(); // The maximum number of cells
+        boolean changed = true; // If there was a change in the last iteration
+
+        while (count < max && changed){
+            changed = false;
+            for (int x = 0; x < width(); x = x + 1) {
+                for (int y = 0; y < height(); y = y + 1) {
+                    if(ans[x][y] != -1){ // If the cell has already been computed,
+                        continue;
+                    }
+                    // Check if the cell can be computed
+                    Cell c = get(x, y);
+                    boolean bool = true;
+                    for (String str : ((SCell) c).getDependencies()) { // Check if all the dependencies have been computed
+                        Index2D cord = new CellEntry(str);
+                        if(!isIn(cord.getX(), cord.getY())){ // If the cell is out of bounds
+                            c.setType(Ex2Utils.ERR_FORM_FORMAT);
+                            c.setOrder(0);
+                            ans[x][y] = 0;
+                            continue;
+                        } else
+                        if (ans[cord.getX()][cord.getY()] == -1) { // If the dependency has not been computed, this cell cannot be computed
+                            bool = false;
+                        }
+                    }
+                    if (bool) { // If all the dependencies have been computed
+                        c.setOrder(depth);
+                        ans[x][y] = depth;
+                        count = count + 1;
+                        changed = true;
+                    }
+                }
+            }
+            depth = depth + 1;
+        }
+        return ans;
+    }
+
+    @Override
+    public void load(String fileName) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(fileName))) {
+            // Clear the existing table
+            for (int i = 0; i < table.length; i++) {
+                for (int j = 0; j < table[i].length; j++) {
+                    table[i][j] = new SCell(Ex2Utils.EMPTY_CELL);
+                }
+            }
+
+            // Read the header line and ignore it
+            reader.readLine();
+
+            // Read the remaining lines
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Split the line by commas
+                String[] parts = line.split(",", 3);
+
+                // Validate the format: must have at least 3 parts
+                if (parts.length < 3) continue;
+
+                try {
+                    int x = Integer.parseInt(parts[0].trim());
+                    int y = Integer.parseInt(parts[1].trim());
+                    String content = parts[2].trim();
+
+                    // Ensure indices are within bounds
+                    if (x >= 0 && x < table.length && y >= 0 && y < table[0].length) {
+                        set(x, y, content);
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore lines with invalid number formats
+                }
+            }
+        }
+
+        // Re-evaluate the sheet after loading
+        eval();
+    }
+
+    @Override
+    public void save(String fileName) throws IOException {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+            // Write the header line
+            writer.write("I2CS ArielU: SpreadSheet (Ex2) assignment" +
+                    "\n");
+
+            // Iterate over all cells and write non-empty cells
+            for (int i = 0; i < table.length; i++) {
+                for (int j = 0; j < table[i].length; j++) {
+                    String content = table[i][j].toString();
+                    if (!content.equals(Ex2Utils.EMPTY_CELL)) {
+                        writer.write(String.format("%d,%d,%s\n", i, j, content));
                     }
                 }
             }
         }
     }
 
-    /**
-     * Checks if the specified coordinates are within the bounds of the sheet.
-     * @param xx The row index.
-     * @param yy The column index.
-     * @return True if the coordinates are within bounds, false otherwise.
-     */
-    @Override
-    public boolean isIn(int xx, int yy) {
-        return xx >= 0 && yy >= 0 && xx < width() && yy < height();
-    }
-
-    /**
-     * Returns a 2D array representing the order of the cells in the sheet.
-     * @return A 2D array where each cell contains the order of the corresponding cell.
-     */
-    @Override
-    public int[][] depth() {
-        int[][] ans = new int[width()][height()];
-        for (int x = 0; x < width(); x++) {
-            for (int y = 0; y < height(); y++) {
-                Cell cell = get(x, y);
-                if (cell != null) {
-                    ans[x][y] = cell.getOrder();
-                }
-            }
-        }
-        return ans;
-    }
-
-    /**
-     * Loads the sheet data from a CSV file.
-     * @param fileName The name of the file to load data from.
-     * @throws IOException If an error occurs while reading the file.
-     */
-    @Override
-    public void load(String fileName) throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
-            String line;
-            int row = 0;
-            while ((line = br.readLine()) != null && row < height()) {
-                String[] cells = line.split(",");
-                for (int col = 0; col < cells.length && col < width(); col++) {
-                    set(row, col, cells[col]);
-                }
-                row++;
-            }
-        }
-    }
-
-    /**
-     * Saves the sheet data to a CSV file.
-     * @param fileName The name of the file to save data to.
-     * @throws IOException If an error occurs while writing to the file.
-     */
-    @Override
-    public void save(String fileName) throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(fileName))) {
-            for (int x = 0; x < width(); x++) {
-                for (int y = 0; y < height(); y++) {
-                    bw.write(get(x, y).getData());
-                    if (y < height() - 1) bw.write(",");
-                }
-                bw.newLine();
-            }
-        }
-    }
-
-    /**
-     * Evaluates the value of the cell at the specified coordinates.
-     * @param x The row index.
-     * @param y The column index.
-     * @return The evaluated value of the cell at the given coordinates.
-     */
     @Override
     public String eval(int x, int y) {
-        return value(x, y);
+        String ans = null;
+        if (get(x, y) != null) {
+            ans = get(x, y).toString();
+        }
+
+        if(get(x, y).getType() == Ex2Utils.NUMBER || get(x, y).getType() == Ex2Utils.TEXT){
+            return ans;
+        }
+
+        else{
+            assert ans != null;
+            ans = ans.replaceAll(" ", "");
+            double res = evalForm(ans);
+            if(Double.isNaN(res)){
+                get(x, y).setType(Ex2Utils.ERR_FORM_FORMAT);
+                return "ERR_FORM";
+            }
+            return "" + res;
+        }
+    }
+
+    private double evalForm(String ans) {
+        return evalFormRec(ans.substring(1));
+    }
+
+
+    private double evalFormRec(String substring) {
+        if (isNumber(substring)) {
+            return Double.parseDouble(substring);
+        }
+
+        if(substring.charAt(0) == '(' && substring.charAt(substring.length()-1) == ')'){
+            return evalFormRec(substring.substring(1, substring.length()-1));
+        }
+
+        // If it is a cell
+        if(substring.length() >=2 && substring.length() <=3 && Character.isLetter(substring.charAt(0))){
+            Index2D c = new CellEntry(substring);
+            int x = c.getX();
+            int y = c.getY();
+            if(isIn(x, y)){
+                Cell cell = get(x, y);
+                if(cell.getType() == Ex2Utils.NUMBER){
+                    return Double.parseDouble(cell.toString());
+                }
+                if(cell.getType() == Ex2Utils.TEXT || cell.getType() == Ex2Utils.ERR_FORM_FORMAT){
+                    return Double.NaN;
+                }
+                else {
+                    return evalForm(cell.toString());
+                }
+            }
+        }
+
+        // Recursively evaluate the expression
+        int mainOperatorIndex = findMainOperator(substring);
+        if (mainOperatorIndex == -1) {
+            return Double.NaN;
+        }
+        char operator = substring.charAt(mainOperatorIndex);
+        String left = substring.substring(0, mainOperatorIndex);
+        String right = substring.substring(mainOperatorIndex + 1);
+
+        return switch (operator) {
+            case '+' -> evalFormRec(left) + evalFormRec(right);
+            case '-' -> evalFormRec(left) - evalFormRec(right);
+            case '*' -> evalFormRec(left) * evalFormRec(right);
+            case '/' -> evalFormRec(left) / evalFormRec(right);
+            default -> Double.NaN;
+        };
+    }
+
+    private static int findMainOperator(String substring) {
+        int index = -1;
+        int parenthesesDepth = 0;
+        double lowestPrecedence = Double.MAX_VALUE;
+
+        for (int i = 0; i < substring.length(); i++) {
+            char ch = substring.charAt(i);
+
+            if (ch == '(') {
+                parenthesesDepth++;
+            } else if (ch == ')') {
+                parenthesesDepth--;
+            } else if (isOperator(ch)) {
+                double precedence = getPrecedence(ch) + parenthesesDepth;
+                if (precedence <= lowestPrecedence) {
+                    lowestPrecedence = precedence;
+                    index = i;
+                }
+            }
+        }
+        return index;
+    }
+
+    private static boolean isOperator(char ch) {
+        return ch == '+' || ch == '-' || ch == '*' || ch == '/';
+    }
+
+    private static double getPrecedence(char operator) {
+        return switch (operator) {
+            case '+', '-' -> 0.25;
+            case '*', '/' -> 0.5;
+            default -> Double.MAX_VALUE;
+        };
+    }
+
+    private boolean isNumber(String s) {
+        try {
+            Double.parseDouble(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }
