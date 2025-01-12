@@ -13,8 +13,8 @@ public class CellEntry implements Index2D {
      * @param y Row index (0-based, e.g., 0 for '0', 1 for '1').
      */
     public CellEntry(int x, int y) {
-        this.x = x;
-        this.y = y;
+        this.x = x; // Assign the column index
+        this.y = y; // Assign the row index
     }
 
     /**
@@ -25,15 +25,18 @@ public class CellEntry implements Index2D {
      */
     public CellEntry(String index) {
         if (index != null && index.length() >= 2) {
-            this.x = index.toUpperCase().charAt(0) - 'A'; // Convert column letter to index
+            // Ensure the input is not null and has at least two characters
+            this.x = index.toUpperCase().charAt(0) - 'A';
+            // Convert the first character (column letter) to a 0-based index
             try {
-                this.y = Integer.parseInt(index.substring(1)); // Convert row part to integer
+                this.y = Integer.parseInt(index.substring(1));
+                // Extract the numeric part (row index) and parse it
             } catch (NumberFormatException e) {
-                this.x = -1; // Invalid row number
+                this.x = -1; // Invalid row number, set as invalid indices
                 this.y = -1;
             }
         } else {
-            this.x = -1; // Invalid format
+            this.x = -1; // Invalid format, set as invalid indices
             this.y = -1;
         }
     }
@@ -45,7 +48,9 @@ public class CellEntry implements Index2D {
      */
     @Override
     public boolean isValid() {
-        return x >= 0 && x < 26 && y >= 0 && y < 100; // Adjust range as needed
+        return x >= 0 && x < 26 && y >= 0 && y < 100;
+        // Check that the column index is between A (0) and Z (25)
+        // and the row index is within 0 to 99 (adjust range as necessary)
     }
 
     /**
@@ -55,7 +60,7 @@ public class CellEntry implements Index2D {
      */
     @Override
     public int getX() {
-        return x;
+        return x; // Return the column index
     }
 
     /**
@@ -65,7 +70,7 @@ public class CellEntry implements Index2D {
      */
     @Override
     public int getY() {
-        return y;
+        return y; // Return the row index
     }
 
     /**
@@ -75,7 +80,9 @@ public class CellEntry implements Index2D {
      */
     @Override
     public String toString() {
-        char col = (char) ('A' + x); // Convert column index to letter
-        return col + String.valueOf(y); // Row index is already 0-based
+        char col = (char) ('A' + x);
+        // Convert the column index back to its corresponding letter
+        return col + String.valueOf(y);
+        // Combine the column letter with the row index as a string
     }
 }
